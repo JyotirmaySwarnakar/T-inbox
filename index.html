@@ -178,11 +178,6 @@
             transition: all 0.2s ease;
         }
 
-        .email-item:hover {
-            background-color: #f7fafc;
-            transform: translateX(5px);
-        }
-
         .email-item h3 {
             color: #2d3748;
             margin-bottom: 8px;
@@ -305,6 +300,37 @@
         }
         /* Header Styles */
 /* Header Styles */
+/* View Email Button Styles */
+.view-email-btn {
+    padding: 8px 15px;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    border: none;
+    border-radius: 8px;
+    cursor: pointer;
+    font-weight: 500;
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 14px;
+}
+
+
+.view-email-btn i {
+    margin-right: 5px;
+}
+
+/* Copy Button Enhancements */
+.copy-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.copy-btn i {
+    margin-right: 5px;
+}
 .site-header {
     position: fixed;
     top: 0;
@@ -417,6 +443,9 @@
                 </button>
             </div>
             <div class="inbox">
+                <div>
+                    <i class="fas fa-spinner fa-spin"></i> 
+                </div>
                 <div class="email-list" id="emailList">
                     <div class="loading">
                         <i class="fas fa-spinner fa-spin"></i> Loading...
@@ -432,11 +461,11 @@
             <div id="emailContent"></div>
         </div>
     </div>
-
     <script>
         const emailInput = document.getElementById('email');
 const emailList = document.getElementById('emailList');
 const errorMessage = document.getElementById('errorMessage');
+const copyBtn = document.querySelector('.copy-btn');
 const apiBaseUrl = 'https://www.1secmail.com/api/v1/';
 
 let login = ''; 
@@ -526,7 +555,6 @@ async function checkEmails() {
         displayEmails(emails);
     } catch (error) {
         console.error('Email fetch error:', error);
-        // Don't show error to user for periodic checks
         emailList.innerHTML = '<div class="loading">Error checking emails.</div>';
     }
 }
@@ -550,15 +578,22 @@ function displayEmails(emails) {
             <h3>${email.subject || 'No Subject'}</h3>
             <p>From: ${email.from || 'Unknown Sender'}</p>
             <p>Date: ${email.date || 'Unknown Date'}</p>
-            <button onclick="fetchEmailDetails(${email.id})">View Email</button>
+            <button onclick="fetchEmailDetails(${email.id})" class="view-email-btn">
+                <i class="fas fa-envelope-open"></i> View Email
+            </button>
         `;
         emailList.appendChild(emailItem);
     });
 }
 
-// Fetch specific email details
+// Fetch and display email details
 async function fetchEmailDetails(messageId) {
     try {
+        if (!login || !domain) {
+            console.warn('No login or domain set');
+            return;
+        }
+
         const url = `${apiBaseUrl}?action=readMessage&login=${login}&domain=${domain}&id=${messageId}`;
         const response = await fetch(url);
         
@@ -567,53 +602,46 @@ async function fetchEmailDetails(messageId) {
         }
         
         const emailDetails = await response.json();
-        displayEmailModal(emailDetails);
+        
+        // Open modal and display email details
+        const modal = document.getElementById('emailModal');
+        const emailContent = document.getElementById('emailContent');
+        
+        // Populate modal with email details
+        emailContent.innerHTML = `
+            <div class="email-header">
+                <h2>${emailDetails.subject || 'No Subject'}</h2>
+                <div class="email-meta">
+                    <p><strong>From:</strong> ${emailDetails.from || 'Unknown'}</p>
+                    <p><strong>To:</strong> ${emailDetails.to || 'Unknown'}</p>
+                    <p><strong>Date:</strong> ${emailDetails.date || 'Unknown Date'}</p>
+                </div>
+            </div>
+            <div class="email-content">
+                ${emailDetails.textBody || emailDetails.htmlBody || 'No content'}
+            </div>
+        `;
+        
+        // Show modal
+        modal.style.display = 'block';
     } catch (error) {
-        console.error('Email details error:', error);
-        errorMessage.textContent = 'Error fetching email details.';
-        errorMessage.style.display = 'block';
+        console.error('Email details fetch error:', error);
+        alert('Failed to fetch email details');
     }
-}
-
-// Display email in modal
-function displayEmailModal(emailDetails) {
-    const emailContent = document.getElementById('emailContent');
-    
-    // Prefer HTML body, fall back to text body
-    const bodyContent = emailDetails.htmlBody || emailDetails.textBody || 'No content';
-    
-    // Handle attachments
-    const attachmentsHTML = emailDetails.attachments && emailDetails.attachments.length > 0
-        ? `<div class="attachments">
-            <strong>Attachments:</strong>
-            <ul>
-                ${emailDetails.attachments.map(att => 
-                    `<li>${att.filename} (${att.contentType}, ${(att.size/1024).toFixed(2)} KB)</li>`
-                ).join('')}
-            </ul>
-           </div>`
-        : '';
-
-    emailContent.innerHTML = `
-        <div class="email-header">
-            <h2>${emailDetails.subject || 'No Subject'}</h2>
-            <p class="email-meta">
-                From: ${emailDetails.from || 'Unknown'} 
-                | Date: ${emailDetails.date || 'Unknown Date'}
-            </p>
-        </div>
-        ${attachmentsHTML}
-        <div class="email-content">${bodyContent}</div>
-    `;
-
-    // Show modal
-    document.getElementById('emailModal').style.display = 'block';
 }
 
 // Copy email to clipboard
 function copyEmail() {
     navigator.clipboard.writeText(emailInput.value)
-        .then(() => alert('Email copied to clipboard!'))
+        .then(() => {
+            // Change button text to 'Copied'
+            copyBtn.innerHTML = '<i class="fas fa-check"></i> Copied';
+            
+            // Revert back to original after 2 seconds
+            setTimeout(() => {
+                copyBtn.innerHTML = '<i class="fas fa-copy"></i> Copy Email';
+            }, 2000);
+        })
         .catch(err => {
             console.error('Copy failed:', err);
             alert('Failed to copy email');
@@ -629,7 +657,7 @@ function closeModal() {
 generateRandomEmail();
 
 // Attach event listeners
-document.querySelector('.copy-btn').addEventListener('click', copyEmail);
+copyBtn.addEventListener('click', copyEmail);
     </script>
     <footer class="site-footer">
         <div class="footer-content">
